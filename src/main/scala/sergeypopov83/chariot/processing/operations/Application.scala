@@ -2,7 +2,7 @@ package sergeypopov83.chariot.processing.operations
 
 
 import io.grpc.netty.NettyServerBuilder
-import scalapb.zio_grpc.{ServerLayer, ServiceList}
+import scalapb.zio_grpc.{ScopedServer, ServiceList}
 import sergeypopov83.chariot.processing.operations.grpc.{GRPCServerDefinition, OperationsGrpcServiceImpl}
 import sergeypopov83.chariot.processing.operations.utils.{OpenTelemetryLayer, serverConfigurationLive}
 import sttp.tapir.server.tracing.opentelemetry.OpenTelemetryTracingConfig.Defaults.instrumentationScopeName
@@ -15,7 +15,7 @@ import zio.{Clock, Duration, Runtime, Scope, URLayer, ZIO, ZIOAppArgs, ZIOAppDef
 
 import java.time.Clock as JClock
 
-class Application extends ZIOAppDefault:
+object Application extends ZIOAppDefault:
 
   val logger: URLayer[Any, Unit] = Runtime.removeDefaultLoggers >>> SLF4J.slf4j
   val systemClock: URLayer[Any, Clock & JClock] = ZLayer.succeed {
@@ -51,14 +51,16 @@ class Application extends ZIOAppDefault:
       for {
         grpc <- servers
         operationsGrpc <- ZIO.service[OperationsGrpcServiceImpl]
-        _ <- ServerLayer
-          .fromServiceList(grpc, ServiceList.add(operationsGrpc)).build.exit
+        server <- ScopedServer
+          .fromServiceList(grpc, ServiceList.add(operationsGrpc))
+        _ <- server.awaitTermination
+        _ <- ZIO.logInfo("Finishing the service")
       } yield ()
     }.provide(live,
       serverConfigurationLive,
       GRPCServerDefinition.live,
       OpenTelemetryLayer.live,
-      //        ZOpenTelemetry.tracing(instrumentationScopeName),
+      //      ZOpenTelemetry.tracing(instrumentationScopeName),
       ZOpenTelemetry.metrics(instrumentationScopeName),
       ZOpenTelemetry.logging(instrumentationScopeName),
       //        ZOpenTelemetry.baggage(),
