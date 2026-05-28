@@ -44,6 +44,29 @@ spec:
             - name: http
               containerPort: {{ .Values.service.port }}
               protocol: TCP
+          env:
+            - name: MONGO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: MONGO_ROOT_PASSWORD
+            - name: MONGO_MY_USER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: MY_USER_PASSWORD
+            - name: MONGO_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: db-config
+                  key: MONGO_USER
+            - name: MONGO_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: db-config
+                  key: MONGO_HOST
+            - name: KAFKA
+              value: {{- .Values.db.kafka.}}
           {{- with .Values.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}

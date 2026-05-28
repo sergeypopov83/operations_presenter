@@ -1,0 +1,7 @@
+db:
+  kafka:
+    KAFKA_USERNAME: gen_user
+    BOOTSTRAP_SERVERS: localhost:9092
+  mongo:
+    host: 194.87.43.35
+    user: gen_user

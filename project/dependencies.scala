@@ -30,7 +30,7 @@ object Dependencies {
     "dev.zio" %% "zio-opentelemetry" % "3.1.16",
     "dev.zio" %% "zio-schema" % "1.8.5",
     "dev.zio" %% "zio-schema-bson" % "1.8.5",
-    "dev.zio" %% "zio-kafka" % "3.5.0",
+    "dev.zio" %% "zio-kafka" % "3.6.0",
     "io.github.kirill5k" %% "mongo4cats-zio" % "0.7.17",
     // Last two are needed for automatic derivation
     "dev.zio" %% "zio-schema-zio-test" % "1.8.5" % Test,
@@ -53,7 +53,8 @@ object Dependencies {
   )
 
   lazy val tests: Seq[ModuleID] = Seq(
-    "org.testcontainers" % "testcontainers-kafka" % "2.0.5" % Test,
+    "org.testcontainers" % "kafka" % "1.21.4" % Test,
+//    "org.testcontainers" % "testcontainers-kafka" % "2.0.5" % Test,
     "org.testcontainers" % "testcontainers-mongodb" % "2.0.5" % Test,
     "org.testcontainers" % "testcontainers" % "2.0.5" % Test,
     "org.scalameta" %% "munit" % "1.3.0" % Test
