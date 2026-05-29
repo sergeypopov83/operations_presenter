@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package sergeypopov83.chariot.processing.sponsorbank.grpc;
+
+import "google/type/money.proto";
+import "google/protobuf/timestamp.proto";
+
+service TransfersService {
+    rpc AddMoneyToCorporateAccountViaApi(AddMoneyToCorporateAccountViaApiRequest) returns (AddMoneyToCorporateAccountViaApiResponse);
+    rpc ReplenishSettlementAccount(ReplenishSettlementAccountRequest) returns (ReplenishSettlementAccountResponse);
+    rpc GetTransferIntoByTransferId(GetTransferIntoByTransferIdRequest) returns (GetTransferIntoByTransferIdResponse);
+}
+
+
+message GetTransferIntoByTransferIdRequest {
+    string id = 1;
+}
+
+message GetTransferIntoByTransferIdResponse {
+    string id = 1;
+    google.type.Money amount = 2;
+    string le_id = 3;
+    google.protobuf.Timestamp created_at = 4;
+    string transferType = 5;
+}
+
+message AddMoneyToCorporateAccountViaApiRequest {
+    google.type.Money amount = 1;
+    string le_id = 2;
+}
+
+message AddMoneyToCorporateAccountViaApiResponse {
+    string id = 1;
+    google.type.Money amount = 2;
+    google.protobuf.Timestamp created_at = 3;
+}
+
+message ReplenishSettlementAccountRequest{
+    google.type.Money amount = 1;
+    string le_id = 2;
+}
+
+message ReplenishSettlementAccountResponse{
+    string id = 1;
+    google.type.Money amount = 2;
+    google.protobuf.Timestamp created_at = 3;
+}

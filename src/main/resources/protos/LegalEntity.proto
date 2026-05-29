@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package sergeypopov83.chariot.processing.sponsorbank.grpc;
+
+import "google/protobuf/timestamp.proto";
+
+message LegalEntity {
+    string id = 1;
+    string name = 2;
+    google.protobuf.Timestamp created_at = 3;
+    string description = 4;
+}

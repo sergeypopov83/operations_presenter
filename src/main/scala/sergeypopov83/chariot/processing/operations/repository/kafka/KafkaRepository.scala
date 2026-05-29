@@ -5,14 +5,15 @@ import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.config.SaslConfigs
 import org.apache.kafka.common.security.auth.SecurityProtocol
-import zio.kafka.consumer.{Consumer, ConsumerSettings, Subscription}
 import org.apache.kafka.common.serialization.{ByteArraySerializer, LongSerializer}
+import zio.kafka.consumer.Consumer.given
+import zio.kafka.consumer.{Consumer, ConsumerSettings, Subscription}
 import zio.kafka.producer.{Producer, ProducerSettings}
 import zio.kafka.serde.Serde
-import zio.{Scope, Task, URIO, ZIO, given}
+import zio.{Scope, Task, URIO, ZIO}
 
-import scala.jdk.CollectionConverters.MapHasAsJava
 import java.util.UUID
+import scala.jdk.CollectionConverters.MapHasAsJava
 
 class KafkaRepository(config: KafkaConfiguration) {
 
@@ -63,23 +64,30 @@ class KafkaRepository(config: KafkaConfiguration) {
     Consumer.make(settings.withGroupId(s"$topic.operation-presenter-group"))
   }
 
-  def consume(topic: String)(f: (rec: ConsumerRecord[Long, Array[Byte]]) => URIO[Scope, Unit]): ZIO[Scope, Throwable, Unit] = 
+  /**
+   * This cound be generalized to ConsumerRecord[K, V] 
+   *
+   * @param topic - the topic of interest
+   * @param f     - consuming function. It's a side effect function  
+   * @return
+   */
+  def consume(topic: String)(f: (rec: ConsumerRecord[String, String]) => URIO[Scope, Unit]): ZIO[Scope, Throwable, Unit] =
     consumer(topic).flatMap(c => c.consumeWith(
-    subscription = Subscription.topics(topic),
-    keyDeserializer = Serde.long,
-    valueDeserializer = Serde.byteArray,
-  ) {
-    r => f(r)
-  })
+      subscription = Subscription.topics(topic),
+      keyDeserializer = Serde.string,
+      valueDeserializer = Serde.string,
+    ) {
+      r => f(r)
+    })
 
-  def produceRecord(producer: Producer, topic: String, key: Long, value: Array[Byte]): Task[RecordMetadata] =
-    producer.produce[Any, Long, Array[Byte]](
+  def produceRecord(producer: Producer, topic: String, key: String, value: String): Task[RecordMetadata] =
+    producer.produce[Any, String, String](
       topic = topic,
       key = key,
       value = value,
-      keySerializer = Serde.long,
-      valueSerializer = Serde.byteArray
-    ).tap( r => 
+      keySerializer = Serde.string,
+      valueSerializer = Serde.string
+    ).tap(r =>
       producer.flush
     )
 

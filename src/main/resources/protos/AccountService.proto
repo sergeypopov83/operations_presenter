@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package sergeypopov83.chariot.processing.sponsorbank.grpc;
+
+import "LegalEntity.proto";
+import "Accounts.proto";
+
+service AccountsService {
+    rpc CreateLegalEntityWithAccounts (CreateLegalEntityWithAccountsRequest) returns (CreateLegalEntityWithAccountsResponse);
+    rpc GetAccounts (GetAccountsRequest) returns (GetAccountsResponse);
+}
+
+message CreateLegalEntityWithAccountsRequest {
+    string name = 1;
+    string description = 2;
+}
+
+message CreateLegalEntityWithAccountsResponse {
+    sergeypopov83.chariot.processing.sponsorbank.grpc.LegalEntity legal_entity = 1;
+    sergeypopov83.chariot.processing.sponsorbank.grpc.Account corporate_account = 2;
+    sergeypopov83.chariot.processing.sponsorbank.grpc.Account payment_account = 3;
+    repeated sergeypopov83.chariot.processing.sponsorbank.grpc.Account currency_accounts = 4;
+}
+
+message GetAccountsRequest {
+    string legal_entity = 1;
+}
+
+message GetAccountsResponse {
+    repeated sergeypopov83.chariot.processing.sponsorbank.grpc.Account accounts = 1;
+}

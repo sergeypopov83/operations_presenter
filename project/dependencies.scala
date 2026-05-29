@@ -1,4 +1,5 @@
-import sbt.*
+import sbt.{Def, *}
+import sbt.Keys.libraryDependencies
 
 object Dependencies {
 
@@ -12,7 +13,13 @@ object Dependencies {
     "com.thesamet.scalapb.common-protos" %% "proto-google-common-protos-scalapb_0.11" % "2.9.6-0" % "protobuf",
   )
 
-  lazy val logging = Seq(
+  lazy val misc: Seq[ModuleID] = Seq(
+    "com.fasterxml.jackson.core" % "jackson-databind" % "2.21.3",
+    "com.fasterxml.jackson.module" % "jackson-module-scala_3" % "2.21.3",
+  )
+
+  lazy val logging: Seq[ModuleID] = Seq(
+    "ch.qos.logback" % "logback-classic" % "1.5.33",
     "ch.qos.logback.contrib" % "logback-json-classic" % "0.1.5",
     "ch.qos.logback.contrib" % "logback-jackson" % "0.1.5"
   )

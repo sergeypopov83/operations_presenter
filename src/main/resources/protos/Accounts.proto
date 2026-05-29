@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package sergeypopov83.chariot.processing.sponsorbank.grpc;
+
+import "google/protobuf/timestamp.proto";
+import "google/type/money.proto";
+
+enum ACCOUNT_TYPE {
+    ACCOUNT_TYPE_UNSPECIFIED = 0;
+    ACCOUNT_TYPE_CORPORATE = 1;
+    ACCOUNT_TYPE_SAFEGUARDING = 2;
+    ACCOUNT_TYPE_PAYMENT_SETTLEMENT = 3;
+    ACCOUNT_TYPE_FEE = 4;;
+    ACCOUNT_TYPE_FX_TRADING = 5;
+    ACCOUNT_TYPE_CAPITAL_FX_GAINTYPE = 6;
+    ACCOUNT_TYPE_CAPITAL = 7;
+    ACCOUNT_TYPE_PERIOD_INCOME = 8;
+    ACCOUNT_TYPE_PERIOD_EXPENSES = 9;
+    ACCOUNT_TYPE_BANK_CASH_ASSETS = 10;
+}
+
+enum ACCOUNT_STATUS {
+    ACCOUNT_STATUS_UNSPECIFIED = 0;
+    ACCOUNT_STATUS_CREATED = 1;
+    ACCOUNT_STATUS_OPERATIONAL = 2;
+    ACCOUNT_STATUS_SUSPENDED = 3;
+    ACCOUNT_STATUS_CLOSED = 4;
+}
+
+enum CURRENCY {
+    CURRENCY_UNSPECIFIED = 0;
+    CURRENCY_EUR = 1;
+    CURRENCY_USD = 3;
+}
+
+message Account {
+    string id = 1;
+    string name = 2;
+    google.type.Money amount = 3;
+    ACCOUNT_TYPE account_type = 4;
+    string owner = 5;
+    ACCOUNT_STATUS status = 6;
+    google.protobuf.Timestamp created_at = 7;
+    google.protobuf.Timestamp last_update = 8;
+//    I know it's better have a oneOf hierarchy but in the name of brevity will have one type with opt fields
+    optional string payment_attributes = 9;
+    optional google.type.Money base_amount = 10;
+}

@@ -18,6 +18,7 @@ lazy val root = project
     libraryDependencies ++= tests,
     libraryDependencies ++= otel,
     libraryDependencies ++= zio,
+    libraryDependencies ++= misc,
 
     // assembly
     assembly / mainClass := Some("sergeypopov83.chariot.processing.sponsorbank.Application"),
