@@ -34,7 +34,7 @@ object RepositoryTestSuite extends ZIOSpecDefault {
             _ <- ZIO.sleep(3.seconds)
             producer <- repo.producer
             results <- ZIO.foreach(1L to 3L) { key =>
-              repo.produceRecord(producer, topic, key, s"msg-$key".getBytes)
+              repo.produceRecord(producer, topic, key.toString, s"msg-$key")
             }
             _ <- ZIO.sleep(5.seconds)
             consumedKeys <- ref.get

@@ -22,6 +22,8 @@ message GetTransferIntoByTransferIdResponse {
     string le_id = 3;
     google.protobuf.Timestamp created_at = 4;
     string transferType = 5;
+    string account_id = 6;
+    string status = 7;
 }
 
 message AddMoneyToCorporateAccountViaApiRequest {

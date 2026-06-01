@@ -19,6 +19,7 @@ object MongoConfiguration {
   val HOST = "MONGO_HOST"
   val PASSWORD = "MONGO_MY_USER_PASSWORD"
   val DEFAULT_DB = "operations"
+  val DEFAULT_COLLECTION = "operations"
 
   // ZIO configuration
   private val configDescription = (Config.string(MongoConfiguration.HOST)

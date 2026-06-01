@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.deser.std.StdDeserializer
 import com.fasterxml.jackson.databind.ser.std.StdSerializer
 import com.fasterxml.jackson.databind.{DeserializationContext, JsonNode, ObjectMapper, SerializerProvider}
 import org.apache.kafka.clients.consumer.ConsumerRecord
+import zio.schema.{Schema, derived}
 
 import java.math.{MathContext, RoundingMode}
 import java.time.Instant
@@ -34,8 +35,6 @@ object OutboxEvent {
   given recordToEvent: Conversion[ConsumerRecord[String, String], JacksonConverter] = convert
 
 }
-
-
 case class Operation(
                       operationId: String,
                       operationType: String,
@@ -44,7 +43,7 @@ case class Operation(
                       amount: MoneyAmount,
                       accountId: String,
                       legalEntityId: String
-                    )
+                    ) derives Schema
 
 case class MoneyAmount(amount: BigDecimal, currency: Currency)
 
