@@ -7,7 +7,7 @@ import zio.{Ref, ZIO, ZLayer}
 
 import java.time.Instant
 
-class OperationsRepositorySuite extends ZIOSpecDefault {
+object OperationsRepositorySuite extends ZIOSpecDefault {
 
   override def spec: Spec[TestEnvironment, Any] = {
     val zRef = Ref.make(List[Operation]())
@@ -20,12 +20,19 @@ class OperationsRepositorySuite extends ZIOSpecDefault {
     } yield ()
 
     (suiteAll("OperationsRepository") {
+
       test("Generate and save 100 events into mongo") {
         for {
           mrepo <- ZIO.service[OperationsRepository.Service]
+          ops <- ZIO.service[Ref[List[Operation]]]
+          listOps <- ops.get
+          result <- mrepo.saveManyOperations(listOps)
+          _ <- ZIO.logInfo(s"${result.getInsertedIds}")
+          insSet = result.getInsertedIds.keySet()
         } yield
-          assertTrue(true)
+          assertTrue(listOps.forall(insSet.contains))
       }
+
       test("Take 50 last innserted operations") {
         for {
           mrepo <- ZIO.service[OperationsRepository.Service]
@@ -43,11 +50,13 @@ class OperationsRepositorySuite extends ZIOSpecDefault {
       }
     } @@ TestAspect.beforeAll(fillRef) @@ TestAspect.afterAll {
       for {repo <- ZIO.service[OperationsRepositoryLive]
-           ops <- zRef
+           ops <- ZIO.service[Ref[List[Operation]]]
            l <- ops.get
            _ <- repo.dropAll(l).orDie
            } yield ()
-    } @@ TestAspect.sequential).provideSomeAuto(ZLayer(testScope), mockMongoDatabase, OperationsRepositoryLive.live)
+    } @@ TestAspect.sequential).provideSomeAuto(ZLayer(testScope), ZLayer {
+      zRef
+    }, mockMongoDatabase, OperationsRepositoryLive.live)
   }
 
 }

@@ -2,13 +2,14 @@ package sergeypopov83.chariot.processing.operations.repository.mongodb
 
 import com.mongodb.MongoClientSettings
 import com.mongodb.client.model.{TimeSeriesGranularity, TimeSeriesOptions}
-import com.mongodb.client.result.InsertOneResult
+import com.mongodb.client.result.{DeleteResult, InsertManyResult, InsertOneResult}
 import mongo4cats.models.collection.IndexOptions
 import mongo4cats.models.database.CreateCollectionOptions
-import mongo4cats.operations.Index
+import mongo4cats.operations.{Filter, Index}
 import mongo4cats.zio.{ZMongoCollection, ZMongoDatabase}
 import org.bson.codecs.configuration.CodecRegistries.{fromProviders, fromRegistries}
 import org.bson.codecs.configuration.{CodecProvider, CodecRegistry}
+import org.bson.types.ObjectId
 import sergeypopov83.chariot.processing.operations.repository.mongodb.OperationsRepository.{OperationMongo, codecRegistry}
 import sergeypopov83.chariot.processing.operations.service.{MoneyAmount, Operation}
 import zio.bson.{BsonCodec, zioBsonCodecProvider}
@@ -23,11 +24,13 @@ object OperationsRepository {
   trait Service {
     def saveOperation(operation: Operation): Task[InsertOneResult]
 
+    def saveManyOperations(operation: Seq[Operation]): Task[InsertManyResult]
+    
     def lastNOperations(opsCount: Int): Task[List[Operation]]
 
     def topNOperationsByAmount(opsCount: Int): Task[List[Operation]]
     
-    def dropAll(list: List[Operation]): Task[Unit] 
+    def dropAll(list: List[Operation]): Task[DeleteResult] 
       
   }
 
@@ -38,13 +41,19 @@ object OperationsRepository {
 
   case class OperationMongo(
                              meta: OperationMongoMeta,
-                             operationId: String,
+                             operationId: ObjectId,
                              operationType: String,
                              status: String,
                              createdAt: Instant,
                              amount: BigDecimal,
                            ) derives Schema
 
+  given objectIdSchema: Schema[ObjectId] =
+    Schema[String].transform(
+      str => new ObjectId(str),
+      id => id.toString
+    )
+  
   // this is bson codec to store and retrieve data from mongo
   given bsonCodec: BsonCodec[OperationMongo] = BsonSchemaCodec.bsonCodec(OperationMongo.derived$Schema)
 
@@ -60,13 +69,13 @@ object OperationsRepository {
     status = trxn.status,
     createdAt = trxn.createdAt,
     amount = trxn.amount.amount,
-    operationId = trxn.operationId
+    operationId = ObjectId(trxn.operationId)
   )
 
   def toOperations(trxn: OperationMongo): Operation = Operation.apply(
     accountId = trxn.meta.accountId,
     legalEntityId = trxn.meta.legalEntityId,
-    operationId = trxn.operationId,
+    operationId = trxn.operationId.toString,
     operationType = trxn.operationType,
     status = trxn.status,
     createdAt = trxn.createdAt,
@@ -119,11 +128,15 @@ class OperationsRepositoryLive(mongoDatabase: ZMongoDatabase, operCollection: ZM
 
   override def saveOperation(operation: Operation): Task[InsertOneResult] = operCollection.insertOne(operation)
 
+  override def saveManyOperations(operation: Seq[Operation]): Task[InsertManyResult] = operCollection.insertMany(operation)
+
   override def lastNOperations(opsCount: Int): Task[List[Operation]] = ???
 
   override def topNOperationsByAmount(opsCount: Int): Task[List[Operation]] = ???
 
-  override def dropAll(list: List[Operation]): Task[Unit] = ???
+  override def dropAll(list: List[Operation]): Task[DeleteResult] = operCollection.deleteMany(
+    Filter.in("_id", list.map(_.operationId))
+  )
     
 
 }
