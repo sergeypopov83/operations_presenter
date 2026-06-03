@@ -1,5 +1,6 @@
 package sergeypopov83.chariot.processing.operations.repository.mongodb
 
+import org.bson.BsonString
 import sergeypopov83.chariot.processing.operations.Generators
 import sergeypopov83.chariot.processing.operations.service.Operation
 import zio.test.*
@@ -10,15 +11,7 @@ import java.time.Instant
 object OperationsRepositorySuite extends ZIOSpecDefault {
 
   override def spec: Spec[TestEnvironment, Any] = {
-    val zRef = Ref.make(List[Operation]())
     val pivotInstant = Instant.ofEpochMilli(1769526627888L)
-
-    val fillRef: ZIO[Sized, Nothing, Unit] = for {
-      trxns <- Generators.accountTransactions(pivotInstant).runCollectN(1000)
-      ref <- zRef
-      _ <- ref.update(_ => trxns)
-    } yield ()
-
     (suiteAll("OperationsRepository") {
 
       test("Generate and save 100 events into mongo") {
@@ -27,10 +20,11 @@ object OperationsRepositorySuite extends ZIOSpecDefault {
           ops <- ZIO.service[Ref[List[Operation]]]
           listOps <- ops.get
           result <- mrepo.saveManyOperations(listOps)
-          _ <- ZIO.logInfo(s"${result.getInsertedIds}")
-          insSet = result.getInsertedIds.keySet()
-        } yield
-          assertTrue(listOps.forall(insSet.contains))
+          ids = result.getInsertedIds.values()
+          _ <- ZIO.logInfo(s"IDS  $ids")
+        } yield {
+          assertTrue(listOps.forall(o => ids.contains(BsonString(o.operationId))))
+        }
       }
 
       test("Take 50 last innserted operations") {
@@ -48,15 +42,22 @@ object OperationsRepositorySuite extends ZIOSpecDefault {
           assertTrue(false)
         }
       }
-    } @@ TestAspect.beforeAll(fillRef) @@ TestAspect.afterAll {
+    } @@ TestAspect.beforeAll{
+      for {
+        trxns <- Generators.accountTransactions(pivotInstant).runCollectN(1000)
+        ref <- ZIO.service[Ref[List[Operation]]]
+        _ <- ref.set(trxns)
+      } yield ()
+    } @@ TestAspect.afterAll {
       for {repo <- ZIO.service[OperationsRepositoryLive]
            ops <- ZIO.service[Ref[List[Operation]]]
            l <- ops.get
            _ <- repo.dropAll(l).orDie
            } yield ()
-    } @@ TestAspect.sequential).provideSomeAuto(ZLayer(testScope), ZLayer {
-      zRef
-    }, mockMongoDatabase, OperationsRepositoryLive.live)
+    } @@ TestAspect.sequential).provideSomeShared[Sized](ZLayer(testScope), ZLayer {
+      Ref.make(List[Operation]())
+    },
+      mockMongoDatabase, OperationsRepositoryLive.live)
   }
-
 }
+

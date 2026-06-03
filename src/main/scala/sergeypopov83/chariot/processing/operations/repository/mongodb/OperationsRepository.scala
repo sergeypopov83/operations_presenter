@@ -40,8 +40,9 @@ object OperationsRepository {
                                )
 
   case class OperationMongo(
+                             _id: String,
                              meta: OperationMongoMeta,
-                             operationId: ObjectId,
+                             operationId: String,
                              operationType: String,
                              status: String,
                              createdAt: Instant,
@@ -64,12 +65,13 @@ object OperationsRepository {
   )
 
   def fromOperations(trxn: Operation): OperationMongo = OperationMongo(
+    _id = trxn.operationId,
     meta = OperationMongoMeta(trxn.accountId, trxn.legalEntityId),
     operationType = trxn.operationType,
     status = trxn.status,
     createdAt = trxn.createdAt,
     amount = trxn.amount.amount,
-    operationId = ObjectId(trxn.operationId)
+    operationId = trxn.operationId
   )
 
   def toOperations(trxn: OperationMongo): Operation = Operation.apply(
@@ -95,14 +97,14 @@ object OperationsRepositoryLive {
     operCollection <- makeTimeSeriesCollection
   } yield new OperationsRepositoryLive(db, operCollection)
 
-  def makeTimeSeriesCollection: ZIO[ZMongoDatabase, Throwable, ZMongoCollection[Operation]] = for {
+  def makeTimeSeriesCollection: ZIO[ZMongoDatabase, Throwable, ZMongoCollection[OperationMongo]] = for {
     db <- ZIO.service[ZMongoDatabase]
     list <- db.listCollectionNames
     _ <- ZIO.ifZIO(ZIO.succeed(!list.toList.contains(MongoConfiguration.DEFAULT_COLLECTION))).apply(db.createCollection(MongoConfiguration.DEFAULT_COLLECTION, CreateCollectionOptions()
       .timeSeriesOptions(
-        TimeSeriesOptions("createdAt").metaField("createdAt").granularity(TimeSeriesGranularity.MINUTES)
+        TimeSeriesOptions("createdAt").metaField("meta").granularity(TimeSeriesGranularity.MINUTES)
       )), ZIO.succeed(()))
-    col <- db.getCollection[Operation](MongoConfiguration.DEFAULT_COLLECTION, codecRegistry)
+    col <- db.getCollection[OperationMongo](MongoConfiguration.DEFAULT_COLLECTION, codecRegistry)
     indexes <- col.listIndexes
     _ <- ZIO.ifZIO(ZIO.attempt(!indexes.toList.exists(idx => idx.getString("name").contains(timeIndexName)))).apply(
       col.createIndex(Index.descending("createdAt"), new IndexOptions().name(timeIndexName)), ZIO.succeed(())
@@ -124,18 +126,20 @@ object OperationsRepositoryLive {
     }
 }
 
-class OperationsRepositoryLive(mongoDatabase: ZMongoDatabase, operCollection: ZMongoCollection[Operation]) extends OperationsRepository.Service {
+class OperationsRepositoryLive(mongoDatabase: ZMongoDatabase, operCollection: ZMongoCollection[OperationMongo]) extends OperationsRepository.Service {
 
-  override def saveOperation(operation: Operation): Task[InsertOneResult] = operCollection.insertOne(operation)
+  import OperationsRepository.fromOperations
 
-  override def saveManyOperations(operation: Seq[Operation]): Task[InsertManyResult] = operCollection.insertMany(operation)
+  override def saveOperation(operation: Operation): Task[InsertOneResult] = operCollection.insertOne(fromOperations(operation))
+
+  override def saveManyOperations(operations: Seq[Operation]): Task[InsertManyResult] = operCollection.insertMany(operations.map(o => fromOperations(o)))
 
   override def lastNOperations(opsCount: Int): Task[List[Operation]] = ???
 
   override def topNOperationsByAmount(opsCount: Int): Task[List[Operation]] = ???
 
   override def dropAll(list: List[Operation]): Task[DeleteResult] = operCollection.deleteMany(
-    Filter.in("_id", list.map(_.operationId))
+    Filter.in("_id", list.map(i => i.operationId))
   )
     
 
