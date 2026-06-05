@@ -21,25 +21,34 @@ object OperationsRepositorySuite extends ZIOSpecDefault {
           listOps <- ops.get
           result <- mrepo.saveManyOperations(listOps)
           ids = result.getInsertedIds.values()
-          _ <- ZIO.logInfo(s"IDS  $ids")
         } yield {
           assertTrue(listOps.forall(o => ids.contains(BsonString(o.operationId))))
         }
       }
 
-      test("Take 50 last innserted operations") {
+      test("Take 50 last inserted operations") {
         for {
           mrepo <- ZIO.service[OperationsRepository.Service]
+          ops <- ZIO.service[Ref[List[Operation]]]
+          r <- mrepo.lastNOperations(50)
+          listOps <- ops.get
+          lastOps = listOps.sortBy(_.createdAt.toEpochMilli * -1).take(50)
         } yield {
-          assertTrue(true == false)
+          val lo = lastOps
+          val rr = r
+          assertTrue(r.zip(lastOps).forall((o1, o2) => o1.createdAt.getEpochSecond == o2.createdAt.getEpochSecond))
         }
       }
 
       test("Take 10 operations that have greatest amount") {
         for {
           mrepo <- ZIO.service[OperationsRepository.Service]
+          r <- mrepo.topNOperationsByAmount(10)
+          ops <- ZIO.service[Ref[List[Operation]]]
+          listOps <- ops.get
+          maxAmts = listOps.sortBy(_.amount.amount * -1).take(10)
         } yield {
-          assertTrue(false)
+          assertTrue(r.zip(maxAmts).forall( (o1, o2) => o1.amount.amount == o2.amount.amount))
         }
       }
     } @@ TestAspect.beforeAll{

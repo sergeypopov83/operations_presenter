@@ -1,11 +1,11 @@
 package sergeypopov83.chariot.processing.operations.repository.mongodb
 
-import com.mongodb.MongoClientSettings
 import com.mongodb.client.model.{TimeSeriesGranularity, TimeSeriesOptions}
 import com.mongodb.client.result.{DeleteResult, InsertManyResult, InsertOneResult}
+import com.mongodb.{ExplainVerbosity, MongoClientSettings}
 import mongo4cats.models.collection.IndexOptions
 import mongo4cats.models.database.CreateCollectionOptions
-import mongo4cats.operations.{Filter, Index}
+import mongo4cats.operations.{Aggregate, Filter, Index, Sort}
 import mongo4cats.zio.{ZMongoCollection, ZMongoDatabase}
 import org.bson.codecs.configuration.CodecRegistries.{fromProviders, fromRegistries}
 import org.bson.codecs.configuration.{CodecProvider, CodecRegistry}
@@ -25,13 +25,13 @@ object OperationsRepository {
     def saveOperation(operation: Operation): Task[InsertOneResult]
 
     def saveManyOperations(operation: Seq[Operation]): Task[InsertManyResult]
-    
+
     def lastNOperations(opsCount: Int): Task[List[Operation]]
 
     def topNOperationsByAmount(opsCount: Int): Task[List[Operation]]
-    
-    def dropAll(list: List[Operation]): Task[DeleteResult] 
-      
+
+    def dropAll(list: List[Operation]): Task[DeleteResult]
+
   }
 
   case class OperationMongoMeta(
@@ -54,7 +54,7 @@ object OperationsRepository {
       str => new ObjectId(str),
       id => id.toString
     )
-  
+
   // this is bson codec to store and retrieve data from mongo
   given bsonCodec: BsonCodec[OperationMongo] = BsonSchemaCodec.bsonCodec(OperationMongo.derived$Schema)
 
@@ -128,19 +128,37 @@ object OperationsRepositoryLive {
 
 class OperationsRepositoryLive(mongoDatabase: ZMongoDatabase, operCollection: ZMongoCollection[OperationMongo]) extends OperationsRepository.Service {
 
-  import OperationsRepository.fromOperations
+  import OperationsRepository.{fromOperations, toOperations}
 
   override def saveOperation(operation: Operation): Task[InsertOneResult] = operCollection.insertOne(fromOperations(operation))
 
   override def saveManyOperations(operations: Seq[Operation]): Task[InsertManyResult] = operCollection.insertMany(operations.map(o => fromOperations(o)))
 
-  override def lastNOperations(opsCount: Int): Task[List[Operation]] = ???
+  override def lastNOperations(opsCount: Int): Task[List[Operation]] = {
+    val aggrQuery = Aggregate.sort(Sort.desc("createdAt"))
+      .limit(opsCount)
+    val q = operCollection.aggregate[OperationMongo](aggrQuery)
+    q.explain(ExplainVerbosity.QUERY_PLANNER).flatMap(expl =>
+      ZIO.logInfo(s"LAST N PERFORMANCE STATS $expl").flatMap(_ =>
+        q.all.map(ol => ol.map(o => toOperations(o)).toList)
+      )
+    )
+  }
 
-  override def topNOperationsByAmount(opsCount: Int): Task[List[Operation]] = ???
+  override def topNOperationsByAmount(opsCount: Int): Task[List[Operation]] = {
+    val aggrQuery = Aggregate.sort(Sort.desc("amount"))
+      .limit(opsCount)
+    val q = operCollection.aggregate[OperationMongo](aggrQuery)
+    q.explain(ExplainVerbosity.QUERY_PLANNER).flatMap(expl =>
+      ZIO.logInfo(s"PERFORMANCE STATS $expl").flatMap(_ =>
+        q.all.map(ol => ol.map(o => toOperations(o)).toList)
+      )
+    )
+  }
 
   override def dropAll(list: List[Operation]): Task[DeleteResult] = operCollection.deleteMany(
     Filter.in("_id", list.map(i => i.operationId))
   )
-    
+
 
 }
