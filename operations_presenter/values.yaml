@@ -54,6 +54,7 @@ db:
     KAFKA_HOST: 89.169.46.86
     KAFKA_PORT: 9092
     KAFKA_USERNAME: gen_user
+    KAFKA_PASSWORD: 0Gc#e-e~l03t@B
     BOOTSTRAP_SERVERS: 89.169.46.86:9092
   mongo:
     host: 194.87.43.35

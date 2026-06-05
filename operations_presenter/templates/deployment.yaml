@@ -65,8 +65,12 @@ spec:
                 configMapKeyRef:
                   name: db-config
                   key: MONGO_HOST
-            - name: KAFKA
-              value: {{- .Values.db.kafka.}}
+            - name: KAFKA_USERNAME
+              value: {{- .Values.db.kafka.KAFKA_USERNAME }}
+            - name: BOOTSTRAP_SERVERS
+              value: {{- .Values.db.kafka.BOOTSTRAP_SERVERS }}
+            - name: KAFKA_PASSWORD
+              value: {{- .Values.db.kafka.KAFKA_PASSWORD }}
           {{- with .Values.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
