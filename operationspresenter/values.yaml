@@ -1,4 +1,4 @@
-# Default values for operations_presenter.
+# Default values for operationspresenter.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
@@ -7,11 +7,13 @@ replicaCount: 1
 
 # This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
 image:
-  repository:
+  name: operationpresenter:latest
+  # apps image
+  appImage: operationpresenter
   # This sets the pull policy for images.
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+  tag: latest
 
 # This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 imagePullSecrets: []
@@ -98,19 +100,16 @@ resources: {}
 
 # This is to set up the liveness and readiness probes more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
 livenessProbe:
-  httpGet:
-    path: /sys/health
-    port: http
+  grpc:
+    port: 9090
   periodSeconds: 10
   successThreshold: 1
   timeoutSeconds: 5
   failureThreshold: 5
 
 readinessProbe:
-  httpGet:
-    path: /sys/health
-    port: http
-    scheme: HTTP
+  grpc:
+    port: 9090
   failureThreshold: 3
   periodSeconds: 10
   successThreshold: 1

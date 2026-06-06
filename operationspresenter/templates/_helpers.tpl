@@ -1,7 +1,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "operations_presenter.name" -}}
+{{- define "operationspresenter.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -10,7 +10,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "operations_presenter.fullname" -}}
+{{- define "operationspresenter.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,16 +26,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "operations_presenter.chart" -}}
+{{- define "operationspresenter.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "operations_presenter.labels" -}}
-helm.sh/chart: {{ include "operations_presenter.chart" . }}
-{{ include "operations_presenter.selectorLabels" . }}
+{{- define "operationspresenter.labels" -}}
+helm.sh/chart: {{ include "operationspresenter.chart" . }}
+{{ include "operationspresenter.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -45,17 +45,17 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "operations_presenter.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "operations_presenter.name" . }}
+{{- define "operationspresenter.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "operationspresenter.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "operations_presenter.serviceAccountName" -}}
+{{- define "operationspresenter.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "operations_presenter.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "operationspresenter.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}

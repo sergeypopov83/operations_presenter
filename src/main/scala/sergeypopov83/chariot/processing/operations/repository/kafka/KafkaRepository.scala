@@ -61,7 +61,7 @@ class KafkaRepository(config: KafkaConfiguration) {
         config.bootstrapServers
       )
 
-    Consumer.make(settings.withGroupId(s"$topic.operation-presenter-group"))
+    Consumer.make(settings.withGroupId(s"$topic.operationpresenter-group"))
   }
 
   /**

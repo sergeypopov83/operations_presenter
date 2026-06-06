@@ -7,12 +7,12 @@ val scala3Version = "3.8.3"
 lazy val root = project
   .in(file("."))
   .settings(
-    name := "operations_presenter",
+    name := "operationspresenter",
     version := "0.1.0-SNAPSHOT",
 
     scalaVersion := scala3Version,
 
-    libraryDependencies += "org.scalameta" %% "munit" % "1.3.0" % Test,
+    libraryDependencies += "org.scalameta" %% "munit" % "1.3.2" % Test,
     libraryDependencies ++= grpc,
     libraryDependencies ++= logging,
     libraryDependencies ++= tests,
@@ -21,14 +21,17 @@ lazy val root = project
     libraryDependencies ++= misc,
 
     // assembly
-    assembly / mainClass := Some("sergeypopov83.chariot.processing.sponsorbank.Application"),
+    assembly / mainClass := Some("sergeypopov83.chariot.processing.operations.Application"),
     assembly / assemblyMergeStrategy := {
       case x if x.endsWith("module-info.class") => MergeStrategy.discard
+      case x if x.endsWith("native-image.properties") => MergeStrategy.first
+      case x if x.endsWith("io.netty.versions.properties") => MergeStrategy.first
+      case x if x.endsWith("native-image/reflect-config.json") => MergeStrategy.first
+      case x if x.endsWith("OSGI-INF/MANIFEST.MF") => MergeStrategy.first
       case x =>
         val oldStrategy = (assembly / assemblyMergeStrategy).value
         oldStrategy(x)
     }
-
   )
 
 Compile / PB.targets := Seq(
