@@ -18,9 +18,9 @@ object OpenTelemetryLayer {
 
   private val resourceName = "OperationsPresenter"
 
-  private def httpTracerProvider(resourceName: String): Task[SdkTracerProvider] = ZIO.attempt(SdkTracerProvider.builder()
+  private def httpTracerProvider(resourceName: String, host: String): Task[SdkTracerProvider] = ZIO.attempt(SdkTracerProvider.builder()
     .addSpanProcessor(BatchSpanProcessor.builder(OtlpHttpSpanExporter.builder()
-      .setEndpoint("http://127.0.0.1:4318/v1/traces").build()
+      .setEndpoint(s"http://$host:4318/v1/traces").build()
     ).build())
     .setResource(
       io.opentelemetry.sdk.resources.Resource.getDefault.merge(
@@ -37,10 +37,10 @@ object OpenTelemetryLayer {
   /**
    * Exports metrics in GRPC
    */
-  private def httpMeterProvider(resourceName: String): RIO[Scope, SdkMeterProvider] =
+  private def httpMeterProvider(resourceName: String, host: String): RIO[Scope, SdkMeterProvider] =
     for {
       metricExporter <- ZIO.succeed(OtlpHttpMetricExporter.builder()
-        .setEndpoint("http://127.0.0.1:4318/v1/metrics")
+        .setEndpoint(s"http://$host:4318/v1/metrics")
         .build())
       metricReader <-
         ZIO.fromAutoCloseable(
@@ -68,11 +68,12 @@ object OpenTelemetryLayer {
           .setInterval(Duration.ofSeconds(30))
           .build
    */
-  val live: ZLayer[Any, Throwable, OpenTelemetrySdk] = ZLayer.scoped {
+  val live: ZLayer[ServerConfiguration, Throwable, OpenTelemetrySdk] = ZLayer.scoped {
     ZIO.acquireRelease {
       for {
-        meterProvider <- httpMeterProvider(resourceName)
-        tracerProvider <- httpTracerProvider(resourceName)
+        config <- ZIO.service[ServerConfiguration]
+        meterProvider <- httpMeterProvider(resourceName, config.telemetry.host)
+        tracerProvider <- httpTracerProvider(resourceName, config.telemetry.host)
         openTelemetrySdk <- ZIO.fromAutoCloseable(
           ZIO.succeed(
             OpenTelemetrySdk

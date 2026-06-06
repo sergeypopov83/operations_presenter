@@ -5,3 +5,6 @@ db:
   mongo:
     host: 194.87.43.35
     user: gen_user
+
+telemetry:
+  host: otel-collector.default.svc.cluster.local

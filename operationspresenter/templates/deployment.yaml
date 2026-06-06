@@ -45,6 +45,8 @@ spec:
               protocol: TCP
               name: grpc
           env:
+            - name: TELEMETRY_HOST
+              value: {{ .Values.telemetry.host }}
             - name: MONGO_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
