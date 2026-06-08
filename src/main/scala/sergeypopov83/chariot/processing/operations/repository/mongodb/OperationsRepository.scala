@@ -3,14 +3,18 @@ package sergeypopov83.chariot.processing.operations.repository.mongodb
 import com.mongodb.client.model.{TimeSeriesGranularity, TimeSeriesOptions}
 import com.mongodb.client.result.{DeleteResult, InsertManyResult, InsertOneResult}
 import com.mongodb.{ExplainVerbosity, MongoClientSettings}
+import mongo4cats.bson.BsonValue
+import mongo4cats.bson.BsonValue.BDateTime
+import mongo4cats.bson.BsonValue.BDateTime.given
 import mongo4cats.models.collection.IndexOptions
 import mongo4cats.models.database.CreateCollectionOptions
-import mongo4cats.operations.{Aggregate, Filter, Index, Sort}
+import mongo4cats.operations.*
 import mongo4cats.zio.{ZMongoCollection, ZMongoDatabase}
+import org.bson.codecs.BsonValueCodec
 import org.bson.codecs.configuration.CodecRegistries.{fromProviders, fromRegistries}
 import org.bson.codecs.configuration.{CodecProvider, CodecRegistry}
 import org.bson.types.ObjectId
-import sergeypopov83.chariot.processing.operations.repository.mongodb.OperationsRepository.{OperationMongo, codecRegistry}
+import sergeypopov83.chariot.processing.operations.repository.mongodb.OperationsRepository.{OperationMongo, OperationsStatistics, TmpAggregateResult, codecRegistry}
 import sergeypopov83.chariot.processing.operations.service.{MoneyAmount, Operation}
 import zio.bson.{BsonCodec, zioBsonCodecProvider}
 import zio.metrics.Metric
@@ -18,7 +22,8 @@ import zio.schema.codec.BsonSchemaCodec
 import zio.schema.{Schema, derived}
 import zio.{Task, ZIO, ZLayer}
 
-import java.time.Instant
+import java.time.temporal.ChronoUnit
+import java.time.{Clock, Instant}
 
 object OperationsRepository {
   trait Service {
@@ -31,6 +36,8 @@ object OperationsRepository {
     def topNOperationsByAmount(opsCount: Int): Task[List[Operation]]
 
     def dropAll(list: List[Operation]): Task[DeleteResult]
+
+    def operationsPeriodStatisticsByLegalEntity(le: String, stratOpt: Option[Instant], endOpt: Option[Instant]): Task[Option[OperationsStatistics]]
 
   }
 
@@ -49,6 +56,20 @@ object OperationsRepository {
                              amount: BigDecimal,
                            ) derives Schema
 
+  case class OperationsStatistics(
+                                   legalEntity: String,
+                                   periodStart: Instant,
+                                   periodEnd: Instant,
+                                   count: Long,
+                                   totalAmount: MoneyAmount
+                                 )
+
+  case class TmpAggregateResult(
+                                 _id: String,
+                                 count: Long,
+                                 totalAmount: BigDecimal,
+                               ) derives Schema
+
   given objectIdSchema: Schema[ObjectId] =
     Schema[String].transform(
       str => new ObjectId(str),
@@ -57,11 +78,14 @@ object OperationsRepository {
 
   // this is bson codec to store and retrieve data from mongo
   given bsonCodec: BsonCodec[OperationMongo] = BsonSchemaCodec.bsonCodec(OperationMongo.derived$Schema)
+  given tmpCodec: BsonCodec[TmpAggregateResult] = BsonSchemaCodec.bsonCodec(TmpAggregateResult.derived$Schema)
 
-  val myDataCodecProvider: CodecProvider = zioBsonCodecProvider[OperationMongo]
+  val operationCodecProvider: CodecProvider = zioBsonCodecProvider[OperationMongo]
+  val tmpAggregateResultCodecProvider: CodecProvider = zioBsonCodecProvider[TmpAggregateResult]
+
   val codecRegistry: CodecRegistry = fromRegistries(
     MongoClientSettings.getDefaultCodecRegistry,
-    fromProviders(myDataCodecProvider)
+    fromProviders(operationCodecProvider, tmpAggregateResultCodecProvider)
   )
 
   def fromOperations(trxn: Operation): OperationMongo = OperationMongo(
@@ -92,10 +116,11 @@ object OperationsRepositoryLive {
   private val operationsRetrievedCounter = Metric.counterInt("operations_retrieved_total")
   private val timeIndexName = "operations_time_index"
 
-  def makeService: ZIO[ZMongoDatabase, Throwable, OperationsRepositoryLive] = for {
+  def makeService: ZIO[ZMongoDatabase & Clock, Throwable, OperationsRepositoryLive] = for {
     db <- ZIO.service[ZMongoDatabase]
     operCollection <- makeTimeSeriesCollection
-  } yield new OperationsRepositoryLive(db, operCollection)
+    clock <- ZIO.service[Clock]
+  } yield new OperationsRepositoryLive(db, operCollection, clock)
 
   def makeTimeSeriesCollection: ZIO[ZMongoDatabase, Throwable, ZMongoCollection[OperationMongo]] = for {
     db <- ZIO.service[ZMongoDatabase]
@@ -120,13 +145,15 @@ object OperationsRepositoryLive {
   }
 
   // ZMongoDatabase -> OperationsRepository
-  val live: ZLayer[ZMongoDatabase, Throwable, OperationsRepositoryLive] =
+  val live: ZLayer[ZMongoDatabase & Clock, Throwable, OperationsRepositoryLive] =
     ZLayer.fromZIO {
       makeService
     }
 }
 
-class OperationsRepositoryLive(mongoDatabase: ZMongoDatabase, operCollection: ZMongoCollection[OperationMongo]) extends OperationsRepository.Service {
+class OperationsRepositoryLive(mongoDatabase: ZMongoDatabase,
+                               operCollection: ZMongoCollection[OperationMongo],
+                               clock: Clock) extends OperationsRepository.Service {
 
   import OperationsRepository.{fromOperations, toOperations}
 
@@ -159,6 +186,27 @@ class OperationsRepositoryLive(mongoDatabase: ZMongoDatabase, operCollection: ZM
   override def dropAll(list: List[Operation]): Task[DeleteResult] = operCollection.deleteMany(
     Filter.in("_id", list.map(i => i.operationId))
   )
+
+  override def operationsPeriodStatisticsByLegalEntity(le: String,
+                                                       stratOpt: Option[Instant],
+                                                       endOpt: Option[Instant]): Task[Option[OperationsStatistics]] = {
+    val now = clock.instant()
+    val start = stratOpt.getOrElse(now.truncatedTo(ChronoUnit.DAYS))
+    val end = endOpt.getOrElse(now.plus(10, ChronoUnit.DAYS))
+    val matchAggr = Aggregate.matchBy(Filter.and(
+      Filter.eq("meta.legalEntityId", le),
+      Filter.gte("createdAt", start),
+      Filter.lte("createdAt", end)
+    )).project(Projection().include(Seq("meta", "amount", "createdAt"))).group(
+      id = "$meta.legalEntityId", // SQL equivalent: GROUP BY department
+      fieldAccumulators = Accumulator.sum("totalAmount", "$amount").sum("count", 1)
+    )
+    operCollection.aggregate[TmpAggregateResult](matchAggr).first.map(tmp =>
+      tmp.map(tmpItem => OperationsStatistics(
+        legalEntity = tmpItem._id, periodStart = start, periodEnd = end, count = tmpItem.count,
+        totalAmount = MoneyAmount(tmpItem.totalAmount, MoneyAmount.EUR))
+      ))
+  }
 
 
 }

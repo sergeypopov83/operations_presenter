@@ -23,26 +23,8 @@ message OperationsPeriodStatisticsByLegalEntityResponse {
     string legal_entity = 1;
     google.protobuf.Timestamp period_start = 2;
     google.protobuf.Timestamp period_end = 3;
-    map<string, OperationsStatisticsByStatus> statistics = 4;
-}
-
-enum AccountTypes {
-    ACCOUNT_TYPES_UNKNOWN = 0;
-    ACCOUNT_TYPES_CREDIT = 1;
-    ACCOUNT_TYPES_DEBIT = 2;
-}
-
-message OperationsStatisticsByStatus {
-    map<string, OperationsPeriodStatistics> statistics = 1;
-}
-
-message OperationsPeriodStatistics {
-    int64 count = 1;
-    google.type.Money debit_sum = 2;
-    google.type.Money credit_sum = 3;
-    google.type.Money current_amount = 4;
-    AccountTypes account_type = 5;
-    string status = 6;
+    int64 count = 4;
+    google.type.Money operations_amount = 5;
 }
 
 message LastNOperationsResponse {

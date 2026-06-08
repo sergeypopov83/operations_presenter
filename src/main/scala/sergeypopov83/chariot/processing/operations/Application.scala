@@ -4,6 +4,7 @@ package sergeypopov83.chariot.processing.operations
 import io.grpc.netty.NettyServerBuilder
 import scalapb.zio_grpc.{ScopedServer, ServiceList}
 import sergeypopov83.chariot.processing.operations.grpc.{GRPCServerDefinition, OperationsGrpcServiceImpl}
+import sergeypopov83.chariot.processing.operations.repository.mongodb.{MongoConfiguration, OperationsRepository, OperationsRepositoryLive}
 import sergeypopov83.chariot.processing.operations.utils.{OpenTelemetryLayer, serverConfigurationLive}
 import sttp.tapir.server.tracing.opentelemetry.OpenTelemetryTracingConfig.Defaults.instrumentationScopeName
 import zio.Clock.ClockLive
@@ -35,11 +36,11 @@ object Application extends ZIOAppDefault:
   )
 
   private type ApplicationOutType = OperationsGrpcServiceImpl
-  private val live: ZLayer[Scope, Any, ApplicationOutType] = ZLayer {
+  private val live: ZLayer[Scope & OperationsRepository.Service, Any, ApplicationOutType] = ZLayer {
     for {
-      s <- ZIO.succeed(OperationsGrpcServiceImpl())
+      s <- ZIO.service[OperationsRepository.Service]
     } yield {
-      s
+      OperationsGrpcServiceImpl(s)
     }
   }
 
@@ -57,6 +58,9 @@ object Application extends ZIOAppDefault:
         _ <- ZIO.logInfo("Finishing the service")
       } yield ()
     }.provide(live,
+      systemClock,
+      MongoConfiguration.liveDb,
+      OperationsRepositoryLive.live,
       serverConfigurationLive,
       GRPCServerDefinition.live,
       OpenTelemetryLayer.live,

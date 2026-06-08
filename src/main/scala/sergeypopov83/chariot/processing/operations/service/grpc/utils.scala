@@ -20,3 +20,14 @@ extension (inst: Instant)
 extension (date: Date)
   def toGrpc: Timestamp =
     date.toInstant.toGrpc
+
+extension (amount: MoneyAmount)
+  def toGrpc: Money = {
+    val allAmount = amount.amount
+    val wholePart = allAmount.toBigInt
+    val mantissa = allAmount - BigDecimal(wholePart)
+    Money.of(currencyCode = amount.currency.getCurrencyCode,
+      units = wholePart.toLong, nanos = (mantissa * BigDecimal(1000000000)).intValue
+    )
+  }
+end extension

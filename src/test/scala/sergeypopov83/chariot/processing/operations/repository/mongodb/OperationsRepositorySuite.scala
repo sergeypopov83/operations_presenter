@@ -2,11 +2,11 @@ package sergeypopov83.chariot.processing.operations.repository.mongodb
 
 import org.bson.BsonString
 import sergeypopov83.chariot.processing.operations.Generators
-import sergeypopov83.chariot.processing.operations.service.Operation
+import sergeypopov83.chariot.processing.operations.service.{MoneyAmount, Operation}
 import zio.test.*
 import zio.{Ref, ZIO, ZLayer}
 
-import java.time.Instant
+import java.time.{Clock, Instant}
 
 object OperationsRepositorySuite extends ZIOSpecDefault {
 
@@ -34,9 +34,22 @@ object OperationsRepositorySuite extends ZIOSpecDefault {
           listOps <- ops.get
           lastOps = listOps.sortBy(_.createdAt.toEpochMilli * -1).take(50)
         } yield {
-          val lo = lastOps
-          val rr = r
           assertTrue(r.zip(lastOps).forall((o1, o2) => o1.createdAt.getEpochSecond == o2.createdAt.getEpochSecond))
+        }
+      }
+      test("Sum and count of operations should be correct") {
+        for {
+          mrepo <- ZIO.service[OperationsRepository.Service]
+          ops <- ZIO.service[Ref[List[Operation]]]
+          listOps <- ops.get
+          testOperation = listOps.head
+          result <- mrepo.operationsPeriodStatisticsByLegalEntity(testOperation.legalEntityId,
+            Option(testOperation.createdAt.minusSeconds(100000000)), Option(testOperation.createdAt.plusSeconds(100000000)))
+          testAmount = listOps.filter(o => o.legalEntityId == testOperation.legalEntityId).foldLeft(MoneyAmount.ZEROEURO){(a,i) =>
+            MoneyAmount(a.amount + i.amount.amount, a.currency)
+          }
+        } yield {
+          assertTrue(testAmount == result.get.totalAmount)
         }
       }
 
@@ -53,7 +66,7 @@ object OperationsRepositorySuite extends ZIOSpecDefault {
       }
     } @@ TestAspect.beforeAll{
       for {
-        trxns <- Generators.accountTransactions(pivotInstant).runCollectN(1000)
+        trxns <- Generators.accountTransactions(pivotInstant).runCollectN(2000)
         ref <- ZIO.service[Ref[List[Operation]]]
         _ <- ref.set(trxns)
       } yield ()
@@ -65,8 +78,7 @@ object OperationsRepositorySuite extends ZIOSpecDefault {
            } yield ()
     } @@ TestAspect.sequential).provideSomeShared[Sized](ZLayer(testScope), ZLayer {
       Ref.make(List[Operation]())
-    },
-      mockMongoDatabase, OperationsRepositoryLive.live)
+    }, ZLayer.succeed(Clock.systemUTC()), mockMongoDatabase, OperationsRepositoryLive.live)
   }
 }
 
